@@ -1,0 +1,11 @@
+gradio
+chromadb
+ollama
+openai
+anthropic
+google-genai
+pillow
+sentence-transformers
+networkx
+pyvis
+pandas
