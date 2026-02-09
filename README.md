@@ -51,7 +51,7 @@
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/digital-second-brain.git
+   git clone https://github.com/pypi-ahmad/digital-second-brain.git
    cd digital-second-brain
    ```
 
