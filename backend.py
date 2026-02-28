@@ -7,7 +7,6 @@ It includes:
 - Vector Database Management (ChromaDB) for storing and retrieving notes.
 - Knowledge Graph Generation (NetworkX, PyVis).
 """
-import gradio as gr
 import ollama
 import chromadb
 from chromadb.utils import embedding_functions
@@ -17,7 +16,7 @@ from openai import OpenAI
 import anthropic
 import google.genai as genai
 import os
-import networkx as nx
+import tempfile
 from pyvis.network import Network
 
 # --- CONFIGURATION ---
@@ -34,8 +33,8 @@ try:
     )
     # Test if it works immediately to trigger fallback if not
     EMBEDDING_FUNC(["test"]) 
-except:
-    print("Warning: embeddinggemma not found or Ollama not running. Using default embeddings.")
+except Exception as e:
+    print(f"Warning: embeddinggemma not found or Ollama not running. Using default embeddings. Details: {e}")
     # Fallback to a standard model if Ollama is not available
     EMBEDDING_FUNC = embedding_functions.DefaultEmbeddingFunction()
 
@@ -94,6 +93,8 @@ def get_llm_response(prompt, system_prompt, provider="Local (Ollama)", model="gl
             response = model_instance.generate_content(f"{system_prompt}\n\n{prompt}")
             return response.text
 
+        return f"Error: Unsupported provider '{provider}'"
+
     except Exception as e:
         return f"Error: {str(e)}"
 
@@ -132,6 +133,8 @@ def process_and_index_note(image_path, provider, model, api_key):
     """
     # 1. OCR
     raw_text = ocr_handwriting(image_path)
+    if isinstance(raw_text, str) and raw_text.startswith("OCR Error:"):
+        return raw_text, "General", "Note"
     
     # 2. Clean & Tag (LLM)
     system_prompt = """
@@ -200,7 +203,10 @@ def search_notes(query, n_results=3):
             for i in range(len(results['documents'][0])):
                 doc = results['documents'][0][i]
                 meta = results['metadatas'][0][i]
-                output.append(f"**Date:** {meta['date']}\n**Tags:** {meta['tags']}\n**Summary:** {meta['summary']}\n\n{doc}\n---")
+                date_value = meta.get('date', '')
+                tags_value = meta.get('tags', '')
+                summary_value = meta.get('summary', '')
+                output.append(f"**Date:** {date_value}\n**Tags:** {tags_value}\n**Summary:** {summary_value}\n\n{doc}\n---")
                 
         return "\n".join(output) if output else "No matching notes found."
     except Exception as e:
@@ -213,6 +219,7 @@ def chat_with_notes(message, history, provider, model, api_key):
     2. Feeds those notes to the LLM as context.
     3. Asks the LLM to answer the question using that context.
     """
+    _ = history
     # 1. Search DB
     context = search_notes(message, n_results=3)
     
@@ -273,10 +280,13 @@ def generate_knowledge_graph():
                 net.add_edge(note_id, tag_id)
 
         # Save and return HTML
-        output_path = "graph.html"
+        output_path = tempfile.NamedTemporaryFile(delete=False, suffix=".html", prefix="graph_").name
         net.save_graph(output_path)
         
         with open(output_path, "r", encoding="utf-8") as f:
-            return f.read()
+            html = f.read()
+
+        os.remove(output_path)
+        return html
     except Exception as e:
         return f"<div>Error generating graph: {str(e)}</div>"
