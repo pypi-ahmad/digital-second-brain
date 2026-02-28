@@ -9,6 +9,8 @@ It uses Gradio to create a web-based interface with tabs for:
 """
 
 import gradio as gr
+import os
+import tempfile
 import backend
 
 # --- UI LOGIC ---
@@ -23,10 +25,14 @@ def handle_scan(image, provider, model, key):
         return "Please upload an image.", "", ""
     
     # Save temp image for path usage
-    temp_path = "temp_note.jpg"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg", prefix="temp_note_") as tmp:
+        temp_path = tmp.name
     image.save(temp_path)
     
-    text, tags, summary = backend.process_and_index_note(temp_path, provider, model, key)
+    try:
+        text, tags, summary = backend.process_and_index_note(temp_path, provider, model, key)
+    finally:
+        os.remove(temp_path)
     return text, tags, summary
 
 def handle_search(query):
@@ -95,7 +101,7 @@ with gr.Blocks(title="Second Brain 🧠") as app:
 
         # TAB 3: CHAT (RAG)
         with gr.TabItem("💬 Chat with Notes"):
-            chatbot = gr.ChatInterface(
+            gr.ChatInterface(
                 fn=handle_chat, 
                 additional_inputs=[provider_dd, model_dd, api_key_input],
                 title="Ask your Second Brain",
